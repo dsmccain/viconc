@@ -11,58 +11,16 @@ def debug(info):
 		print info
 
 def file_to_node_list(f):
-	''' Debug Format:
-			------------
-			Explore \d+
-			------------
-			((
-				[
-
-				Replay (\d+) is required...
-				Done replaying...
-
-				]
-				Plan: ...
-				Happened before: ...
-				Selected: ...
-				Pick next: Enabled: [...] Sleeping: [...]
-				Picked: [...]
-			))
-			|
-			((
-				Backtrack set explored
-				[NORMAL!|DEADLOCK!|SLEEP SET BLOCK]
-				Stack frame dropped
-			))
-			|
-			((
-				ERROR!
-				...
-			))
-	'''
-	regex = "(?:------------)\n" +\
-			"(?:Explore (\d+))\n" +\
-			"(?:------------)\n" +\
-			"(?:" +\
-				"(?:" +\
-					"\nReplay \((\d+)\) is required\.\.\.\n" +\
-					"Done replaying\.\.\.\n\n" +\
-				")?" +\
-				"(Plan: \{.*\})\n" +\
-				"(Happened before: \[(?:\s*\{\"[\d.]+\",\d+\},?)*\])\n" +\
-				"(Selected: \{\"[\d.]+\",(?:\n\s+.+|.+)+\})\n" +\
-				"(Pick next: Enabled: \[(?:\s*\"[\d.]+\",?)*\]" +\
-					" Sleeping: \[(?:\s*\"[\d.]+\",?)*\])\n" +\
-				"(Picked: \[(?:\"[\d.]+\")?\])\n" +\
-			"|" +\
-				"Backtrack set explored\n" +\
-				"(?:(?:(NORMAL|DEADLOCK)!|SLEEP SET BLOCK)\n)?" +\
-				"Stack frame dropped\n" +\
-			"|" +\
-				"ERROR!\n" +\
-				"(\{\"[\d.]+\",\n\s*(?:\n\s+.+|.+)+\}\n)" +\
-			")"
-
+	regex = "(?:(\d+): " +\
+					"(?:" +\
+						"(?:(action) :: (.+))" +\
+					"|" +\
+						"(?:(backtrack) :: (\w+))" +\
+					"|" +\
+						"(error)" +\
+					"|" +\
+						"(cycle)" +\
+					"))"
 	# print ">>>> Starting findall with regex"
 
 	data = re.findall(regex, f.read())
@@ -76,69 +34,43 @@ def file_to_node_list(f):
 		explore_n = element[0]
 		node['explore_n'] = explore_n
 
-		if element[2] != '': # Check if a plan exists
-			# Check if replay was needed:
-			if element[1] != '':
-				node['replay'] = element[1]
-				replay = '** Replay: ' + element[1] + '\n'
-			else:
-				replay = ''
-
-			node['plan'] = element[2]
-			# This regex will give back a list of tuples, where the first
-			# element is '{"\d+",\d+}' and the second element is the second \d+
-			before_nodes_regex = "(\{\"[\d.]+\",(\d+)\})"
-			before_nodes = re.findall(before_nodes_regex, element[3])
-			# Only the second \d+ will be used
-			node['before'] = [int(n[1]) for n in before_nodes]
-			node['selected'] = element[4]
-			node['pick_next'] = element[5]
-			node['picked'] = element[6]
+		if element[1] == 'action': # Check if an action was taken
+			node['action'] = element[2]
 			# TODO: Check for color. Make children look similar to parents?
 
 			# Replace every " for \" in the texts
-			plan = re.sub('"', '\\"', element[2])
-			happened = re.sub('"', '\\"', element[3])
-			selected = re.sub('"', '\\"', element[4])
-			pick_next = re.sub('"', '\\"', element[5])
-			picked = re.sub('"', '\\"', element[6])
+			action = re.sub('"', '\\"', element[2])
+
+			label = '"Explore ' + explore_n + " | element " +\
+					str(element_n) + '\\n' + action + '"'
+			node_dot_text = "// Explore " + str(element_n) + "\n" +\
+							str(element_n) + " [label = " + label + "];\n"
+		# Check if there was a backtrack
+		elif element[3] == 'backtrack':
+			node['backtrack'] = element[4]
 
 			label = '"Explore ' + explore_n + " | element " +\
 					str(element_n) + '\\n' +\
-					replay +\
-					'~ ' + plan + '\\n' +\
-					'~ ' + happened + '\\n' +\
-					'~ ' + selected + '\\n' +\
-					'~ ' + pick_next + '\\n' +\
-					'~ ' + picked+'"'
+					'Backtrack set explored: ' + element[4] + '"'
 			node_dot_text = "// Explore " + str(element_n) + "\n" +\
-							str(element_n) + " [label = " + label + "];\n"
+						str(element_n) + " [label = " + label + "];\n"
+		# Check if there was an error
+		elif element[5] == 'error':
+			node['error'] = True
 
-			node['text'] = node_dot_text
-		else:
-			# Check if there was an error
-			if element[8] == '':
-				backtrack_info = element[7]
-				node['backtrack'] = backtrack_info
+			label = '"Explore ' + explore_n + " | element " +\
+					str(element_n) + '\\n' + 'ERROR!"'
+			node_dot_text = "// Explore " + str(element_n) + "\n" +\
+						str(element_n) + " [label = " + label + "];\n"
+		# Check if there was a cycle
+		elif element[6] == 'cycle':
+			node['cycle'] = True
+			label = '"Explore ' + explore_n + " | element " +\
+					str(element_n) + '\\n' + 'CYCLE!"'
+			node_dot_text = "// Explore " + str(element_n) + "\n" +\
+						str(element_n) + " [label = " + label + "];\n"
 
-				label = '"Explore ' + explore_n + " | element " +\
-						str(element_n) + '\\n' +\
-						'Backtrack set explored.'
-				if backtrack_info != '':
-					label += ' ' + backtrack_info
-				label += '"'
-				node_dot_text = "// Explore " + str(element_n) + "\n" +\
-							str(element_n) + " [label = " + label + "];\n"
-			else:
-				error = element[8]
-				node['error'] = error
-				label = '"Explore ' + explore_n + " | element " +\
-						str(element_n) + '\\n' +\
-						'ERROR!\n' + error + '"'
-				node_dot_text = "// Explore " + str(element_n) + "\n" +\
-							str(element_n) + " [label = " + label + "];\n"
-
-			node['text'] = node_dot_text
+		node['text'] = node_dot_text
 		node_list.append(node)
 		element_n += 1
 
@@ -149,7 +81,7 @@ def create_clusters(node_list):
 	connection_groups = []
 	adjacent_list = []
 	for node in node_list:
-		if 'plan' in node: # Check if a plan exists
+		if 'action' in node: # Check if an action was taken
 			adjacent_list.append(node)
 		else:
 			if adjacent_list != []:
@@ -157,35 +89,12 @@ def create_clusters(node_list):
 			adjacent_list = []
 	return connection_groups
 
-# Returned is a dict where the key is the element number and the value is a list
-# of element numbers that are needed to create the key
-def all_previous_connections(node_list):
-	before_dict = dict()
-	explore_element_dict = dict()
-
-	for node in node_list:
-		explore_n = node.get('explore_n')
-		if 'plan' in node:
-			element_n = node.get('element_n')
-			explore_element_dict[int(explore_n)] = element_n
-			prev_elem_list = []
-			##print str(element_n) + ".get('before'): " + str(node.get('before'))
-			for prev_explore in node.get('before'):
-				prev_elem_list.append(explore_element_dict.get(prev_explore))
-			##print "prev_elem_list" + str(prev_elem_list)
-			before_dict[element_n] = prev_elem_list
-		else: # The explore key is no longer related to the element number
-			explore_element_dict.pop(explore_n, None)
-
-	return before_dict
-
 # String with the full content of the dot file
 def dot_file_content(node_list):
 	node_dot_list = ""
 	for node in node_list:
-		if 'plan' in node: # Only show nodes with a plan
+		if 'action' in node: # Only show nodes with an action
 			node_dot_list += node.get('text')
-	#debug(node_dot_list)
 	node_dot_list_str = str(node_dot_list)
 
 	node_clusters = create_clusters(node_list)
@@ -210,24 +119,23 @@ def dot_file_content(node_list):
 		ending_node = node_list[group[-1].get('element_n')]
 		# The high weight is added to make a straight line of nodes
 		cluster_node_style = ' [weight=1000];\n'
-		if 'backtrack' in ending_node:
-			ending = ending_node.get('backtrack')
-			if ending == "DEADLOCK":
-				cluster_info += ' -> lock_' + str(cluster_n)
-				cluster_info += cluster_node_style
-				cluster_info += 'lock_' + str(cluster_n) +\
-				' [image="marmalade_lock.png", label="", style=invisible];\n'
-			else:
-				cluster_info += ' -> ok_' + str(cluster_n)
-				cluster_info += cluster_node_style
-				cluster_info += 'ok_' + str(cluster_n) +\
-					' [image="marmalade_checkmark.png",' +\
-					' label="", style=invisible];\n'
+		if ('backtrack' in ending_node and
+				ending_node.get('backtrack') != 'normal'):
+			cluster_info += ' -> lock_' + str(cluster_n)
+			cluster_info += cluster_node_style
+			cluster_info += 'lock_' + str(cluster_n) +\
+			' [image="marmalade_lock.png", label="", style=invisible];\n'
 		elif 'error' in ending_node:
 			cluster_info += ' -> bad_' + str(cluster_n)
 			cluster_info += cluster_node_style
 			cluster_info += 'bad_' + str(cluster_n) +\
 				' [image="marmalade_cross.png",' +\
+				' label="", style=invisible];\n'
+		elif 'cycle' in ending_node:
+			cluster_info += ' -> cycle_' + str(cluster_n)
+			cluster_info += cluster_node_style
+			cluster_info += 'cycle_' + str(cluster_n) +\
+				' [image="marmalade_cycle.png",' +\
 				' label="", style=invisible];\n'
 		else:
 			cluster_info += ' -> ok_' + str(cluster_n)
@@ -237,19 +145,6 @@ def dot_file_content(node_list):
 				' label="", style=invisible];\n'
 		cluster_info += '}\n\n'
 		cluster_n = cluster_n + 1
-
-	# # Visualize each previous connection to every node
-	# connection_list = ""
-	# for elem, prev_list in all_previous_connections(node_list).iteritems():
-	# 	if prev_list: # If the previous list of nodes is not empty
-	# 		if len(prev_list) > 1:
-	# 			#label_text = str(prev_list) + ' => ' + str(elem)
-	# 			label_text = ''
-	# 		else:
-	# 			label_text = ''
-	# 		for prev_elem in prev_list:
-	# 			connection_list += str(prev_elem) + ' -> ' + str(elem) +\
-	# 								' [label = "' + label_text + '"];\n'
 
 	# Show backtrack arrow:
 	connection_list = ""
@@ -270,14 +165,14 @@ def dot_file_content(node_list):
 	pathname = os.path.dirname(sys.argv[0])
 	image_path = os.path.abspath(pathname)+'/img'
 
+	# //splines=line;//maybe?
+	# //splines=ortho;//maybe?
+	# //rankdir=LR;
+	# //rankdir=TB;
+	# //TODO: look at the following attributes:
+	# //TODO: rankstep
+	# //TODO: sep
 	file_info = 'digraph {\n' +\
-				'//splines=line;//maybe?\n' +\
-				'//splines=ortho;//maybe?\n' +\
-				'//rankdir=LR;\n' +\
-				'//rankdir=TB;\n' +\
-				'//TODO: look at the following attributes:\n' +\
-				'//TODO: rankstep\n' +\
-				'//TODO: sep\n' +\
 				'\n' +\
 				'imagepath="'+image_path+'"\n' +\
 				'node [shape=box]\n' +\
@@ -323,7 +218,7 @@ if __name__ == "__main__":
 		f = open(dot_file, 'w')
 		f.write(dot_file_content(node_list))
 		f.close()
-		output_file = filename + '_graph'
+		output_file = filename # + '_graph'
 		# TODO: Check sfdp
 		if len(argv) == 3:
 			call(["dot", "-T"+argv[2], "-o" +output_file+'.'+argv[2], dot_file])
