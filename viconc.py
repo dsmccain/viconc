@@ -43,7 +43,7 @@ def file_to_node_list(f):
 
 			label = '"Explore ' + explore_n + " | element " +\
 					str(element_n) + '\\n' + action + '"'
-			node_dot_text = "// Explore " + str(element_n) + "\n" +\
+			node_dot_text = "// Element " + str(element_n) + "\n" +\
 							str(element_n) + " [label = " + label + "];\n"
 		# Check if there was a backtrack
 		elif element[3] == 'backtrack':
@@ -52,7 +52,7 @@ def file_to_node_list(f):
 			label = '"Explore ' + explore_n + " | element " +\
 					str(element_n) + '\\n' +\
 					'Backtrack set explored: ' + element[4] + '"'
-			node_dot_text = "// Explore " + str(element_n) + "\n" +\
+			node_dot_text = "// Element " + str(element_n) + "\n" +\
 						str(element_n) + " [label = " + label + "];\n"
 		# Check if there was an error
 		elif element[5] == 'error':
@@ -146,8 +146,8 @@ def dot_file_content(node_list):
 		cluster_info += '}\n\n'
 		cluster_n = cluster_n + 1
 
-	# Show backtrack arrow:
-	connection_list = ""
+	# Show arrow to interleavings after a backtrack:
+	connection_list = "//Interleavings after backtrack\n"
 	explore_element_dict = dict()
 	for group in node_clusters:
 		first_element_n = group[0].get('element_n')
@@ -160,6 +160,28 @@ def dot_file_content(node_list):
 			explore_n = node.get('explore_n')
 			element_n = node.get('element_n')
 			explore_element_dict[explore_n] = element_n
+
+	# Correct the graph so the track numbers are shown from left to right
+	order_nodes = []
+	chronological_ordering = "\n//Chronological track ordering\n"
+	chronological_ordering += 'node[shape=none, width=0, height=0, label=""];\n'
+	chronological_ordering += 'edge[dir=none, style=invisible];\n'
+	for i in range(1, len(node_clusters) + 1):
+		order_nodes.append('o'+str(i))
+	chronological_ordering += '{rank=same;'
+	for node in order_nodes:
+		chronological_ordering += node
+		if node != order_nodes[-1]:
+			chronological_ordering += ','
+	chronological_ordering += '}\n'
+	for node in order_nodes:
+		chronological_ordering += node
+		if node != order_nodes[-1]:
+			chronological_ordering += ' -> '
+	chronological_ordering += ';\n'
+	for i in range(0, len(node_clusters)):
+		chronological_ordering += order_nodes[i] + ' -> ' +\
+				str(node_clusters[i][0].get('element_n')) + ';\n'
 
 	# Path where images are located:
 	pathname = os.path.dirname(sys.argv[0])
@@ -181,7 +203,8 @@ def dot_file_content(node_list):
 				 node_dot_list_str + '\n' +\
 				 cluster_info +\
 				 connection_list +\
-				'}'
+				 chronological_ordering +\
+				'}\n'
 	return file_info
 
 # Show the different blocks of information and what fields they contain
