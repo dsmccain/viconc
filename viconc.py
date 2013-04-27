@@ -11,16 +11,16 @@ def debug(info):
 		print info
 
 def file_to_node_list(f):
-	regex = "(?:(\d+): " +\
-					"(?:" +\
-						"(?:(action) :: (.+))" +\
-					"|" +\
-						"(?:(backtrack) :: (\w+))" +\
-					"|" +\
-						"(error)" +\
-					"|" +\
-						"(cycle)" +\
-					"))"
+	regex = '(?:(\d+): ' +\
+					'(?:' +\
+						'(?:(action) :: "(.+)")' +\
+					'|' +\
+						'(?:(backtrack) :: (\w+))' +\
+					'|' +\
+						'(error)' +\
+					'|' +\
+						'(cycle)' +\
+					'))'
 	# print ">>>> Starting findall with regex"
 
 	data = re.findall(regex, f.read())
@@ -38,8 +38,8 @@ def file_to_node_list(f):
 			node['action'] = element[2]
 			# TODO: Check for color. Make children look similar to parents?
 
-			# Replace every " for \" in the texts
-			action = re.sub('"', '\\"', element[2])
+			# Replace every " for \" in the texts, if not preceded by \
+			action = re.sub('[^\\\]"', '\\"', element[2])
 
 			label = '"Explore ' + explore_n + " | element " +\
 					str(element_n) + '\\n' + action + '"'
@@ -121,10 +121,16 @@ def dot_file_content(node_list):
 		cluster_node_style = ' [weight=1000];\n'
 		if ('backtrack' in ending_node and
 				ending_node.get('backtrack') != 'normal'):
-			cluster_info += ' -> lock_' + str(cluster_n)
-			cluster_info += cluster_node_style
-			cluster_info += 'lock_' + str(cluster_n) +\
-			' [image="marmalade_lock.png", label="", style=invisible];\n'
+			if ending_node.get('backtrack') == 'deadlock':
+				cluster_info += ' -> lock_' + str(cluster_n)
+				cluster_info += cluster_node_style
+				cluster_info += 'lock_' + str(cluster_n) +\
+				' [image="marmalade_lock.png", label="", style=invisible];\n'
+			elif ending_node.get('backtrack') == 'sleep_set_block':
+				cluster_info += ' -> sleep_set_block_' + str(cluster_n)
+				cluster_info += cluster_node_style
+				cluster_info += 'sleep_set_block_' + str(cluster_n) +\
+				' [image="marmalade_warning.png", label="", style=invisible];\n'
 		elif 'error' in ending_node:
 			cluster_info += ' -> bad_' + str(cluster_n)
 			cluster_info += cluster_node_style
@@ -236,16 +242,15 @@ if __name__ == "__main__":
 		node_list = file_to_node_list(f)
 		f.close()
 		debug(print_nodes(node_list))
-		# TODO: Write parsed data to file?
 		dot_file = filename + '.dot'
 		f = open(dot_file, 'w')
 		f.write(dot_file_content(node_list))
 		f.close()
-		output_file = filename # + '_graph'
+		output_file = filename
 		# TODO: Check sfdp
 		if len(argv) == 3:
-			call(["dot", "-T"+argv[2], "-o" +output_file+'.'+argv[2], dot_file])
+			call(["dot", "-T"+argv[2], "-o" +output_file+'.'+argv[2],
+				dot_file])
 		else:
 			call(["dot", "-Tpdf", "-o" + output_file + ".pdf", dot_file])
 			# call(["dot", "-Tpng", "-o" + output_file + ".png", dot_file])
-		print "Graph generated"
