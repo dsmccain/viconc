@@ -118,37 +118,32 @@ def dot_file_content(node_list):
 		# Check how a track ends
 		ending_node = node_list[group[-1].get('element_n')]
 		# The high weight is added to make a straight line of nodes
-		cluster_node_style = ' [weight=1000];\n'
+		cluster_node_style = '[weight=1000]'
 		if ('backtrack' in ending_node and
 				ending_node.get('backtrack') != 'normal'):
 			if ending_node.get('backtrack') == 'deadlock':
-				cluster_info += ' -> lock_' + str(cluster_n)
-				cluster_info += cluster_node_style
-				cluster_info += 'lock_' + str(cluster_n) +\
-				' [image="marmalade_lock.png", label="", style=invisible];\n'
+				lock_image = "marmalade_lock.png"
+				ending_name = 'lock_' + str(cluster_n)
+				ending_image = lock_image
 			elif ending_node.get('backtrack') == 'sleep_set_block':
-				cluster_info += ' -> sleep_set_block_' + str(cluster_n)
-				cluster_info += cluster_node_style
-				cluster_info += 'sleep_set_block_' + str(cluster_n) +\
-				' [image="marmalade_warning.png", label="", style=invisible];\n'
+				warning_image = "marmalade_warning.png"
+				ending_name = 'sleep_set_block_' + str(cluster_n)
+				ending_image = warning_image
 		elif 'error' in ending_node:
-			cluster_info += ' -> bad_' + str(cluster_n)
-			cluster_info += cluster_node_style
-			cluster_info += 'bad_' + str(cluster_n) +\
-				' [image="marmalade_cross.png",' +\
-				' label="", style=invisible];\n'
+			cross_image = "marmalade_cross.png"
+			ending_name = 'bad_' + str(cluster_n)
+			ending_image = cross_image
 		elif 'cycle' in ending_node:
-			cluster_info += ' -> cycle_' + str(cluster_n)
-			cluster_info += cluster_node_style
-			cluster_info += 'cycle_' + str(cluster_n) +\
-				' [image="marmalade_cycle.png",' +\
-				' label="", style=invisible];\n'
+			cycle_image = "marmalade_cycle.png"
+			ending_name = 'cycle_' + str(cluster_n)
+			ending_image = cycle_image
 		else:
-			cluster_info += ' -> ok_' + str(cluster_n)
-			cluster_info += cluster_node_style
-			cluster_info += 'ok_' + str(cluster_n) +\
-				' [image="marmalade_checkmark.png",' +\
-				' label="", style=invisible];\n'
+			checkmark_image = "marmalade_checkmark.png"
+			ending_name = 'ok_' + str(cluster_n)
+			ending_image = checkmark_image
+		cluster_info += ' -> ' + ending_name + ' ' + cluster_node_style + ';\n'
+		cluster_info += ending_name +' [image="'+ending_image+'"' +\
+				', label="", style=invisible];\n'
 		cluster_info += '}\n\n'
 		cluster_n = cluster_n + 1
 
@@ -203,6 +198,7 @@ def dot_file_content(node_list):
 	file_info = 'digraph {\n' +\
 				'\n' +\
 				'imagepath="'+image_path+'"\n' +\
+				'//splines=ortho;\n' +\
 				'node [shape=box]\n' +\
 				'//node [shape=point]\n' +\
 				'node [style="filled,rounded"]\n\n' +\
@@ -210,6 +206,7 @@ def dot_file_content(node_list):
 				 cluster_info +\
 				 connection_list +\
 				 chronological_ordering +\
+				'\n' +\
 				'}\n'
 	return file_info
 
