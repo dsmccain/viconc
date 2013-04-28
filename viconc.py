@@ -102,6 +102,8 @@ def dot_file_content(node_list):
 	# Create the dot clusters
 	cluster_info = ""
 	cluster_n = 1
+	# keep track of how they finish for chronological ordering:
+	ending_cluster_nodes = []
 	for group in node_clusters:
 		cluster_info += 'subgraph cluster_'+str(cluster_n) +' {\n' +\
 						'label = "Track ' + str(cluster_n) + '";\n' +\
@@ -146,6 +148,7 @@ def dot_file_content(node_list):
 				', label="", style=invisible];\n'
 		cluster_info += '}\n\n'
 		cluster_n = cluster_n + 1
+		ending_cluster_nodes.append(ending_name)
 
 	# Show arrow to interleavings after a backtrack:
 	connection_list = "//Interleavings after backtrack\n"
@@ -163,26 +166,44 @@ def dot_file_content(node_list):
 			explore_element_dict[explore_n] = element_n
 
 	# Correct the graph so the track numbers are shown from left to right
-	order_nodes = []
+	top_order_nodes = []
+	bottom_order_nodes = []
 	chronological_ordering = "\n//Chronological track ordering\n"
 	chronological_ordering += 'node[shape=none, width=0, height=0, label=""];\n'
 	chronological_ordering += 'edge[dir=none, style=invisible];\n'
 	for i in range(1, len(node_clusters) + 1):
-		order_nodes.append('o'+str(i))
-	chronological_ordering += '{rank=same;'
-	for node in order_nodes:
-		chronological_ordering += node
-		if node != order_nodes[-1]:
-			chronological_ordering += ','
-	chronological_ordering += '}\n'
-	for node in order_nodes:
-		chronological_ordering += node
-		if node != order_nodes[-1]:
-			chronological_ordering += ' -> '
-	chronological_ordering += ';\n'
+		top_order_nodes.append('t'+str(i))
+		bottom_order_nodes.append('b'+str(i))
+	top_rank_text = '{rank=same;'
+	bottom_rank_text = '{rank=same;'
 	for i in range(0, len(node_clusters)):
-		chronological_ordering += order_nodes[i] + ' -> ' +\
+		top_rank_text += top_order_nodes[i]
+		bottom_rank_text += bottom_order_nodes[i]
+		if i != len(node_clusters)-1:
+			top_rank_text += ','
+			bottom_rank_text += ','
+		else:
+			top_rank_text += '}\n'
+			bottom_rank_text += '}\n'
+	for i in range(0, len(node_clusters)):
+		top_rank_text += top_order_nodes[i]
+		bottom_rank_text += bottom_order_nodes[i]
+		if i != len(node_clusters)-1:
+			top_rank_text += ' -> '
+			bottom_rank_text += ' -> '
+		else:
+			top_rank_text += ';\n'
+			bottom_rank_text += ';\n'
+	# First the top hidden nodes are displayed in the dot file
+	chronological_ordering += top_rank_text
+	for i in range(0, len(node_clusters)):
+		chronological_ordering += top_order_nodes[i] + ' -> ' +\
 				str(node_clusters[i][0].get('element_n')) + ';\n'
+	# After, the bottom hidden nodes are displayed in the dot file
+	chronological_ordering += bottom_rank_text
+	for i in range(0, len(ending_cluster_nodes)):
+		chronological_ordering += str(ending_cluster_nodes[i]) + ' -> ' +\
+				bottom_order_nodes[i] + ';\n'
 
 	# Path where images are located:
 	pathname = os.path.dirname(sys.argv[0])
@@ -199,6 +220,8 @@ def dot_file_content(node_list):
 				'\n' +\
 				'imagepath="'+image_path+'"\n' +\
 				'//splines=ortho;\n' +\
+				'//nodesep=1;\n' +\
+				'//ranksep=equally;\n' +\
 				'node [shape=box]\n' +\
 				'//node [shape=point]\n' +\
 				'node [style="filled,rounded"]\n\n' +\
@@ -251,3 +274,4 @@ if __name__ == "__main__":
 		else:
 			call(["dot", "-Tpdf", "-o" + output_file + ".pdf", dot_file])
 			# call(["dot", "-Tpng", "-o" + output_file + ".png", dot_file])
+		print "Finished"
