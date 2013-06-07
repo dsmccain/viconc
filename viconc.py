@@ -27,6 +27,7 @@ def file_to_node_list(f):
 
 	node_list = []
 	element_n = 1
+	action_n = 1
 
 	for element in data:
 		node = dict()
@@ -42,9 +43,10 @@ def file_to_node_list(f):
 			action = re.sub('[^\\\]"', '\\"', element[2])
 
 			label = '"Explore ' + explore_n + " | element " +\
-					str(element_n) + '\\n' + action + '"'
+					str(action_n) + '\\n' + action + '"'
 			node_dot_text = "// Element " + str(element_n) + "\n" +\
 							str(element_n) + " [label = " + label + "];\n"
+			action_n += 1
 		# Check if there was a backtrack
 		elif element[3] == 'backtrack':
 			node['backtrack'] = element[4]
@@ -80,13 +82,18 @@ def create_clusters(node_list):
 	# The tracks are separated with the adjacent elements
 	connection_groups = []
 	adjacent_list = []
+	created_cluster = False
 	for node in node_list:
 		if 'action' in node: # Check if an action was taken
 			adjacent_list.append(node)
+			created_cluster = False
 		else:
 			if adjacent_list != []:
 				connection_groups.append(adjacent_list)
 			adjacent_list = []
+			created_cluster = True
+	if not created_cluster:
+		connection_groups.append(adjacent_list)
 	return connection_groups
 
 # String with the full content of the dot file
@@ -118,31 +125,38 @@ def dot_file_content(node_list):
 				first_node = False
 			cluster_info += str(node.get('element_n'))
 		# Check how a track ends
-		ending_node = node_list[group[-1].get('element_n')]
+		last_node_n = group[-1].get('element_n')
 		# The high weight is added to make a straight line of nodes
 		cluster_node_style = '[weight=1000]'
-		if ('backtrack' in ending_node and
-				ending_node.get('backtrack') != 'normal'):
-			if ending_node.get('backtrack') == 'deadlock':
-				lock_image = "marmalade_lock.png"
-				ending_name = 'lock_' + str(cluster_n)
-				ending_image = lock_image
-			elif ending_node.get('backtrack') == 'sleep_set_block':
-				warning_image = "marmalade_warning.png"
-				ending_name = 'sleep_set_block_' + str(cluster_n)
-				ending_image = warning_image
-		elif 'error' in ending_node:
-			cross_image = "marmalade_cross.png"
-			ending_name = 'bad_' + str(cluster_n)
-			ending_image = cross_image
-		elif 'cycle' in ending_node:
-			cycle_image = "marmalade_cycle.png"
-			ending_name = 'cycle_' + str(cluster_n)
-			ending_image = cycle_image
+		# Then the Concuerror was stopped by the user, a warning will show
+		if last_node_n >= len(node_list):
+			warning_image = "marmalade_warning.png"
+			ending_name = 'sleep_set_block_' + str(cluster_n)
+			ending_image = warning_image
 		else:
-			checkmark_image = "marmalade_checkmark.png"
-			ending_name = 'ok_' + str(cluster_n)
-			ending_image = checkmark_image
+			ending_node = node_list[last_node_n]
+			if ('backtrack' in ending_node and
+					ending_node.get('backtrack') != 'normal'):
+				if ending_node.get('backtrack') == 'deadlock':
+					lock_image = "marmalade_lock.png"
+					ending_name = 'lock_' + str(cluster_n)
+					ending_image = lock_image
+				elif ending_node.get('backtrack') == 'sleep_set_block':
+					warning_image = "marmalade_warning.png"
+					ending_name = 'sleep_set_block_' + str(cluster_n)
+					ending_image = warning_image
+			elif 'error' in ending_node:
+				cross_image = "marmalade_cross.png"
+				ending_name = 'bad_' + str(cluster_n)
+				ending_image = cross_image
+			elif 'cycle' in ending_node:
+				cycle_image = "marmalade_cycle.png"
+				ending_name = 'cycle_' + str(cluster_n)
+				ending_image = cycle_image
+			else:
+				checkmark_image = "marmalade_checkmark.png"
+				ending_name = 'ok_' + str(cluster_n)
+				ending_image = checkmark_image
 		cluster_info += ' -> ' + ending_name + ' ' + cluster_node_style + ';\n'
 		cluster_info += ending_name +' [image="'+ending_image+'"' +\
 				', label="", style=invisible];\n'
@@ -166,44 +180,46 @@ def dot_file_content(node_list):
 			explore_element_dict[explore_n] = element_n
 
 	# Correct the graph so the track numbers are shown from left to right
-	top_order_nodes = []
-	bottom_order_nodes = []
-	chronological_ordering = "\n//Chronological track ordering\n"
-	chronological_ordering += 'node[shape=none, width=0, height=0, label=""];\n'
-	chronological_ordering += 'edge[dir=none, style=invisible];\n'
-	for i in range(1, len(node_clusters) + 1):
-		top_order_nodes.append('t'+str(i))
-		bottom_order_nodes.append('b'+str(i))
-	top_rank_text = '{rank=same;'
-	bottom_rank_text = '{rank=same;'
-	for i in range(0, len(node_clusters)):
-		top_rank_text += top_order_nodes[i]
-		bottom_rank_text += bottom_order_nodes[i]
-		if i != len(node_clusters)-1:
-			top_rank_text += ','
-			bottom_rank_text += ','
-		else:
-			top_rank_text += '}\n'
-			bottom_rank_text += '}\n'
-	for i in range(0, len(node_clusters)):
-		top_rank_text += top_order_nodes[i]
-		bottom_rank_text += bottom_order_nodes[i]
-		if i != len(node_clusters)-1:
-			top_rank_text += ' -> '
-			bottom_rank_text += ' -> '
-		else:
-			top_rank_text += ';\n'
-			bottom_rank_text += ';\n'
-	# First the top hidden nodes are displayed in the dot file
-	chronological_ordering += top_rank_text
-	for i in range(0, len(node_clusters)):
-		chronological_ordering += top_order_nodes[i] + ' -> ' +\
-				str(node_clusters[i][0].get('element_n')) + ';\n'
-	# After, the bottom hidden nodes are displayed in the dot file
-	chronological_ordering += bottom_rank_text
-	for i in range(0, len(ending_cluster_nodes)):
-		chronological_ordering += str(ending_cluster_nodes[i]) + ' -> ' +\
-				bottom_order_nodes[i] + ';\n'
+	chronological_ordering = ""
+	if len(node_clusters) > 0:
+		top_order_nodes = []
+		bottom_order_nodes = []
+		chronological_ordering = "\n//Chronological track ordering\n"
+		chronological_ordering += 'node[shape=none, width=0, height=0, label=""];\n'
+		chronological_ordering += 'edge[dir=none, style=invisible];\n'
+		for i in range(1, len(node_clusters) + 1):
+			top_order_nodes.append('t'+str(i))
+			bottom_order_nodes.append('b'+str(i))
+		top_rank_text = '{rank=same;'
+		bottom_rank_text = '{rank=same;'
+		for i in range(0, len(node_clusters)):
+			top_rank_text += top_order_nodes[i]
+			bottom_rank_text += bottom_order_nodes[i]
+			if i != len(node_clusters)-1:
+				top_rank_text += ','
+				bottom_rank_text += ','
+			else:
+				top_rank_text += '}\n'
+				bottom_rank_text += '}\n'
+		for i in range(0, len(node_clusters)):
+			top_rank_text += top_order_nodes[i]
+			bottom_rank_text += bottom_order_nodes[i]
+			if i != len(node_clusters)-1:
+				top_rank_text += ' -> '
+				bottom_rank_text += ' -> '
+			else:
+				top_rank_text += ';\n'
+				bottom_rank_text += ';\n'
+		# First the top hidden nodes are displayed in the dot file
+		chronological_ordering += top_rank_text
+		for i in range(0, len(node_clusters)):
+			chronological_ordering += top_order_nodes[i] + ' -> ' +\
+					str(node_clusters[i][0].get('element_n')) + ';\n'
+		# After, the bottom hidden nodes are displayed in the dot file
+		chronological_ordering += bottom_rank_text
+		for i in range(0, len(ending_cluster_nodes)):
+			chronological_ordering += str(ending_cluster_nodes[i]) + ' -> ' +\
+					bottom_order_nodes[i] + ';\n'
 
 	# Path where images are located:
 	pathname = os.path.dirname(sys.argv[0])
