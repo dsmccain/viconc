@@ -1,4 +1,5 @@
 #!/usr/bin/python2
+##/usr/bin/env python2
 import os,sys
 
 # TODO: Color difference with spawns?
@@ -37,29 +38,22 @@ def file_to_node_list(f):
 
 		if element[1] == 'action': # Check if an action was taken
 			node['action'] = element[2]
-			# TODO: Check for color. Make children look similar to parents?
-
 			# Replace every " for \" in the texts, if not preceded by \
 			action = re.sub('[^\\\]"', '\\"', element[2])
-
-			label = '"Explore ' + explore_n + " | element " +\
+			label = '"Explore ' + explore_n + " | Action " +\
 					str(action_n) + '\\n' + action + '"'
-			node_dot_text = "// Element " + str(element_n) + "\n" +\
-							str(element_n) + " [label = " + label + "];\n"
+			node_dot_text = str(element_n) + " [label = " + label + "];\n"
 			action_n += 1
 		# Check if there was a backtrack
 		elif element[3] == 'backtrack':
 			node['backtrack'] = element[4]
-
 			label = '"Explore ' + explore_n + " | element " +\
 					str(element_n) + '\\n' +\
 					'Backtrack set explored: ' + element[4] + '"'
-			node_dot_text = "// Element " + str(element_n) + "\n" +\
-						str(element_n) + " [label = " + label + "];\n"
+			node_dot_text = str(element_n) + " [label = " + label + "];\n"
 		# Check if there was an error
 		elif element[5] == 'error':
 			node['error'] = True
-
 			label = '"Explore ' + explore_n + " | element " +\
 					str(element_n) + '\\n' + 'ERROR!"'
 			node_dot_text = "// Explore " + str(element_n) + "\n" +\
@@ -131,7 +125,7 @@ def dot_file_content(node_list):
 		# Then the Concuerror was stopped by the user, a warning will show
 		if last_node_n >= len(node_list):
 			warning_image = "marmalade_warning.png"
-			ending_name = 'sleep_set_block_' + str(cluster_n)
+			ending_name = 'warning_' + str(cluster_n)
 			ending_image = warning_image
 		else:
 			ending_node = node_list[last_node_n]
@@ -142,6 +136,7 @@ def dot_file_content(node_list):
 					ending_name = 'lock_' + str(cluster_n)
 					ending_image = lock_image
 				elif ending_node.get('backtrack') == 'sleep_set_block':
+					# warning_image = "marmalade_checkmark.png"
 					warning_image = "marmalade_warning.png"
 					ending_name = 'sleep_set_block_' + str(cluster_n)
 					ending_image = warning_image
@@ -238,9 +233,12 @@ def dot_file_content(node_list):
 				'//splines=ortho;\n' +\
 				'//nodesep=1;\n' +\
 				'//ranksep=equally;\n' +\
+				'//node [shape=plaintext]\n' +\
 				'node [shape=box]\n' +\
 				'//node [shape=point]\n' +\
-				'node [style="filled,rounded"]\n\n' +\
+				'node [style="filled,rounded"]\n' +\
+				'edge [arrowhead="vee"]\n\n' +\
+				'// Interaction information nodes\n' +\
 				 node_dot_list_str + '\n' +\
 				 cluster_info +\
 				 connection_list +\
