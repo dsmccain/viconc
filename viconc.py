@@ -27,53 +27,53 @@ def file_to_node_list(f):
 	data = re.findall(regex, f.read())
 
 	node_list = []
-	element_n = 1
+	event_n = 1
 	action_n = 1
 
-	for element in data:
+	for event in data:
 		node = dict()
-		node['element_n'] = element_n
-		explore_n = element[0]
+		node['event_n'] = event_n
+		explore_n = event[0]
 		node['explore_n'] = explore_n
 
-		if element[1] == 'action': # Check if an action was taken
-			node['action'] = element[2]
+		if event[1] == 'action': # Check if an action was taken
+			node['action'] = event[2]
 			# Replace every " for \" in the texts, if not preceded by \
-			action = re.sub('[^\\\]"', '\\"', element[2])
+			action = re.sub('[^\\\]"', '\\"', event[2])
 			label = '"Explore ' + explore_n + " | Action " +\
 					str(action_n) + '\\n' + action + '"'
-			node_dot_text = str(element_n) + " [label = " + label + "];\n"
+			node_dot_text = str(event_n) + " [label = " + label + "];\n"
 			action_n += 1
 		# Check if there was a backtrack
-		elif element[3] == 'backtrack':
-			node['backtrack'] = element[4]
-			label = '"Explore ' + explore_n + " | element " +\
-					str(element_n) + '\\n' +\
-					'Backtrack set explored: ' + element[4] + '"'
-			node_dot_text = str(element_n) + " [label = " + label + "];\n"
+		elif event[3] == 'backtrack':
+			node['backtrack'] = event[4]
+			label = '"Explore ' + explore_n + " | event " +\
+					str(event_n) + '\\n' +\
+					'Backtrack set explored: ' + event[4] + '"'
+			node_dot_text = str(event_n) + " [label = " + label + "];\n"
 		# Check if there was an error
-		elif element[5] == 'error':
+		elif event[5] == 'error':
 			node['error'] = True
-			label = '"Explore ' + explore_n + " | element " +\
-					str(element_n) + '\\n' + 'ERROR!"'
-			node_dot_text = "// Explore " + str(element_n) + "\n" +\
-						str(element_n) + " [label = " + label + "];\n"
+			label = '"Explore ' + explore_n + " | event " +\
+					str(event_n) + '\\n' + 'ERROR!"'
+			node_dot_text = "// Explore " + str(event_n) + "\n" +\
+						str(event_n) + " [label = " + label + "];\n"
 		# Check if there was a cycle
-		elif element[6] == 'cycle':
+		elif event[6] == 'cycle':
 			node['cycle'] = True
-			label = '"Explore ' + explore_n + " | element " +\
-					str(element_n) + '\\n' + 'CYCLE!"'
-			node_dot_text = "// Explore " + str(element_n) + "\n" +\
-						str(element_n) + " [label = " + label + "];\n"
+			label = '"Explore ' + explore_n + " | event " +\
+					str(event_n) + '\\n' + 'CYCLE!"'
+			node_dot_text = "// Explore " + str(event_n) + "\n" +\
+						str(event_n) + " [label = " + label + "];\n"
 
 		node['text'] = node_dot_text
 		node_list.append(node)
-		element_n += 1
+		event_n += 1
 
 	return node_list
 
 def create_clusters(node_list):
-	# The tracks are separated with the adjacent elements
+	# The tracks are separated with the adjacent events
 	connection_groups = []
 	adjacent_list = []
 	created_cluster = False
@@ -117,9 +117,9 @@ def dot_file_content(node_list):
 				cluster_info += ' -> '
 			else:
 				first_node = False
-			cluster_info += str(node.get('element_n'))
+			cluster_info += str(node.get('event_n'))
 		# Check how a track ends
-		last_node_n = group[-1].get('element_n')
+		last_node_n = group[-1].get('event_n')
 		# The high weight is added to make a straight line of nodes
 		cluster_node_style = '[weight=1000]'
 		# Then the Concuerror was stopped by the user, a warning will show
@@ -161,18 +161,18 @@ def dot_file_content(node_list):
 
 	# Show arrow to interleavings after a backtrack:
 	connection_list = "//Interleavings after backtrack\n"
-	explore_element_dict = dict()
+	explore_event_dict = dict()
 	for group in node_clusters:
-		first_element_n = group[0].get('element_n')
-		if first_element_n > 1:
+		first_event_n = group[0].get('event_n')
+		if first_event_n > 1:
 			first_explore_n = int(group[0].get('explore_n'))
 			prev_explore = str(first_explore_n - 1)
-			connection_list += str(explore_element_dict.get(prev_explore)) +\
-					' -> ' + str(first_element_n) + ';\n'
+			connection_list += str(explore_event_dict.get(prev_explore)) +\
+					' -> ' + str(first_event_n) + ';\n'
 		for node in group:
 			explore_n = node.get('explore_n')
-			element_n = node.get('element_n')
-			explore_element_dict[explore_n] = element_n
+			event_n = node.get('event_n')
+			explore_event_dict[explore_n] = event_n
 
 	# Correct the graph so the track numbers are shown from left to right
 	chronological_ordering = ""
@@ -209,7 +209,7 @@ def dot_file_content(node_list):
 		chronological_ordering += top_rank_text
 		for i in range(0, len(node_clusters)):
 			chronological_ordering += top_order_nodes[i] + ' -> ' +\
-					str(node_clusters[i][0].get('element_n')) + ';\n'
+					str(node_clusters[i][0].get('event_n')) + ';\n'
 		# After, the bottom hidden nodes are displayed in the dot file
 		chronological_ordering += bottom_rank_text
 		for i in range(0, len(ending_cluster_nodes)):
