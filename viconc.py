@@ -1,8 +1,10 @@
 #!/usr/bin/python2
 ##/usr/bin/env python2
-import os,sys
 
-# TODO: Color difference with spawns?
+import os
+import sys
+import re
+import subprocess
 
 # DEBUG = True
 DEBUG = False
@@ -154,7 +156,7 @@ def dot_file_content(node_list):
 				ending_image = checkmark_image
 		cluster_info += ' -> ' + ending_name + ' ' + cluster_node_style + ';\n'
 		cluster_info += ending_name +' [image="'+ending_image+'"' +\
-				', label="", style=invisible];\n'
+						', label="", style=invisible];\n'
 		cluster_info += '}\n\n'
 		cluster_n = cluster_n + 1
 		ending_cluster_nodes.append(ending_name)
@@ -168,7 +170,7 @@ def dot_file_content(node_list):
 			first_explore_n = int(group[0].get('explore_n'))
 			prev_explore = str(first_explore_n - 1)
 			connection_list += str(explore_event_dict.get(prev_explore)) +\
-					' -> ' + str(first_event_n) + ';\n'
+							' -> ' + str(first_event_n) + ';\n'
 		for node in group:
 			explore_n = node.get('explore_n')
 			event_n = node.get('event_n')
@@ -180,8 +182,10 @@ def dot_file_content(node_list):
 		top_order_nodes = []
 		bottom_order_nodes = []
 		chronological_ordering = "\n//Chronological track ordering\n"
-		chronological_ordering += 'node[shape=none, width=0, height=0, label=""];\n'
-		chronological_ordering += 'edge[dir=none, style=invisible];\n'
+		node_properties = 'node[shape=none, width=0, height=0, label=""];'
+		edge_properties = 'edge[dir=none, style=invisible];'
+		chronological_ordering += node_properties + '\n'
+		chronological_ordering += edge_properties + '\n'
 		for i in range(1, len(node_clusters) + 1):
 			top_order_nodes.append('t'+str(i))
 			bottom_order_nodes.append('b'+str(i))
@@ -263,29 +267,31 @@ def print_nodes(node_list):
 	return text
 
 if __name__ == "__main__":
-	import re
-	from sys import argv
-	from os.path import isfile
-	from subprocess import call
 
-	if len(argv) == 1 or len(argv) > 3 or not isfile(argv[1]):
-		print "Use: " + argv[0] + " conquerror_output_file [output format]"
+	argLen = len(sys.argv)
+
+	if argLen == 1 or argLen > 3 or not os.path.isfile(sys.argv[1]):
+		print "Use: " + sys.argv[0] + " conquerror_graph_file [output_format]"
 	else:
-		filename = argv[1]
+		filename = sys.argv[1]
 		f = open(filename, 'r')
 		node_list = file_to_node_list(f)
 		f.close()
+
 		debug(print_nodes(node_list))
+
 		dot_file = filename + '.dot'
 		f = open(dot_file, 'w')
 		f.write(dot_file_content(node_list))
 		f.close()
+
 		output_file = filename
+		# Default output format as pdf file
+		outFormat = "pdf"
+		if argLen == 3:
+			outFormat = sys.argv[2]
 		# TODO: Check sfdp
-		if len(argv) == 3:
-			call(["dot", "-T"+argv[2], "-o" +output_file+'.'+argv[2],
-				dot_file])
-		else:
-			call(["dot", "-Tpdf", "-o" + output_file + ".pdf", dot_file])
-			# call(["dot", "-Tpng", "-o" + output_file + ".png", dot_file])
+		subprocess.call(["dot", "-T"+outFormat, "-o" +output_file+'.'+outFormat,
+						dot_file])
+
 		print "Finished"
